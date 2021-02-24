@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/src/WriteYourselfAGit.Cli/bin/Debug/netcoreapp3.0/WriteYourselfAGit.Cli.dll",
+            "program": "${workspaceFolder}/src/WriteYourselfAGit.Cli/bin/Debug/net5.0/WriteYourselfAGit.Cli.dll",
             "args": ["hash-object", "-w", "-t", "blob", "/tmp/test.bin"],
             // "cwd": "${workspaceFolder}/src/WriteYourselfAGit.Cli",
             "cwd": "/tmp/git_example/",
