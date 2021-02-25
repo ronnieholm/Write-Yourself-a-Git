@@ -1,8 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.IO;
-using WriteYourselfAGit.Core;
 using System.Text;
+using WriteYourselfAGit.Core;
 
 // TODO: create test that runs through all commands.
 // TODO: add non-nullable reference types check.
@@ -10,7 +10,7 @@ using System.Text;
 
 namespace WriteYourselfAGit.Cli
 {
-    class Program
+    static class Program
     {
         static void Usage()
         {
@@ -31,20 +31,46 @@ namespace WriteYourselfAGit.Cli
                 tag");
             Environment.Exit(0);
         }
-
+        
+        static int _idx;
+        
         static void Main(string[] args)
         {
+            // {
+            //     KeyValueListWithMessageParser.Parse(null);
+            //
+            //     var repo = new GitRepository("/tmp/git_example");
+            //     repo.ReadGitObject("e27bb34b0807ebf1b91bb66a4c147430cde4f08f");
+            //
+            //     var blob = new GitBlob(repo, Encoding.ASCII.GetBytes("123456789"));
+            //     var objectId = repo.WriteGitObject(blob, true);
+            //     var blob1 = repo.ReadGitObject(objectId);
+            // }
+
+            if (args.Length == 0)
+                Usage();
+
+            var command = args[_idx++];
+            switch (command)
             {
-                KeyValueListWithMessageParser.Parse(null);
+                case "init":
+                {
+                    if (args.Length != 2)
+                        Usage();
 
-                var repo = new GitRepository("/tmp/git_example");
-                repo.ReadGitObject("e27bb34b0807ebf1b91bb66a4c147430cde4f08f");
-
-                var blob = new GitBlob(repo, Encoding.ASCII.GetBytes("123456789"));
-                var objectId = repo.WriteGitObject(blob, true);
-                var blob1 = repo.ReadGitObject(objectId);
+                    // Path is optional. If missing, assume current directory.
+                    var path = args.Length == 2 ? args[_idx++] : ".";
+                    GitRepository.Init(path);
+                    break;
+                }
+                case "abc":
+                {
+                    break;
+                }
             }
 
+            return;
+            
             switch (args[0])
             {
                 case "add":
@@ -86,7 +112,8 @@ namespace WriteYourselfAGit.Cli
                             i++;
                             continue;
                         }
-                        else if (args[i] == "-t")
+
+                        if (args[i] == "-t")
                         {
                             var success = Enum.TryParse<GitObject.ObjectType>(args[i + 1], true, out format);
                             if (!success)
@@ -97,7 +124,8 @@ namespace WriteYourselfAGit.Cli
                             i += 2;
                             continue;
                         }
-                        else if (i == args.Length - 1)
+
+                        if (i == args.Length - 1)
                         {
                             path = args[i];
                             break;
@@ -115,7 +143,7 @@ namespace WriteYourselfAGit.Cli
                     var path = ".";
                     if (args.Length == 2)
                         path = args[1];
-                    Init(path);
+                    GitRepository.Init(path);
                     break;
                 }
                 case "log":
@@ -139,23 +167,7 @@ namespace WriteYourselfAGit.Cli
                     break;
             }
         }
-
-        static void Init(string path)
-        {
-            var repository = new GitRepository(path, true);
-            if (File.Exists(repository.WorkTree))
-                throw new Exception($"Not a directory: {new DirectoryInfo(repository.WorkTree).FullName}");
-            if (Directory.Exists(repository.WorkTree) && Directory.EnumerateFileSystemEntries(repository.WorkTree).Any())
-                throw new Exception($"Directory not empty: {new DirectoryInfo(repository.WorkTree).FullName}");
-
-            foreach (var p in new[] { "branches", "objects", "refs/tags", "refs/heads" })
-                repository.EnsureDirectoryPath(p, true);
-
-            File.WriteAllText(repository.EnsureFilePath("description", false), "Unnamed repository; edit this file 'description' to name the repository\n");
-            File.WriteAllText(repository.EnsureFilePath("HEAD", false), "ref: refs/heads/master\n");
-            File.WriteAllText(repository.EnsureFilePath("config", false), GitRepository.GetDefaultConfig());
-        }
-
+        
         static void CatFile(GitObject.ObjectType format, string objectId)
         {
             var repo = GitRepository.FindGitRoot(Environment.CurrentDirectory);
@@ -167,12 +179,12 @@ namespace WriteYourselfAGit.Cli
 
         static void HashObject(bool write, GitObject.ObjectType format, string path)
         {
-            GitRepository repo = null;
+            GitRepository? repo = null;
             if (write)
                 repo = GitRepository.FindGitRoot(Environment.CurrentDirectory);
             
             var bytes = File.ReadAllBytes(path);
-            GitObject obj = null;
+            GitObject? obj = null;
             switch (format)
             {
                 case GitObject.ObjectType.Commit:
