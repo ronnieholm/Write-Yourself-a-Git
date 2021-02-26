@@ -49,7 +49,7 @@ namespace WriteYourselfAGit.Core
                 EnsureDirectoryPath(Path.Join(dotGit, directory), true);
 
             File.WriteAllText(EnsureFilePath(Path.Join(dotGit, "description"), false), "Unnamed repository; edit this file 'description' to name the repository\n");
-            File.WriteAllText(EnsureFilePath(Path.Join(dotGit,"HEAD"), false), "ref: refs/heads/master\n");
+            File.WriteAllText(EnsureFilePath(Path.Join(dotGit, "HEAD"), false), "ref: refs/heads/master\n");
             
             var content = new IniFileReaderWriter();
             content.Set("core", "repositoryformatversion", "0");
@@ -84,22 +84,22 @@ namespace WriteYourselfAGit.Core
             return path;
         }
         
-        public static GitRepository FindGitRoot(string path = ".", bool required = true)
+        public static GitRepository FindGitRoot(string path)
         {
-            var gitPath = Path.Join(path, ".git");
-            if (Directory.Exists(gitPath))
+            var git = Path.Join(path, ".git");
+            if (Directory.Exists(git))
                 return new GitRepository(path);
 
-            var parentPath = Directory.GetParent(path);
+            var parent = Directory.GetParent(path);
 
             // We're at root and cannot navigate up any further
-            if (parentPath != null)
-                return FindGitRoot(parentPath.FullName, required);
-            if (required)
-                throw new Exception("No git directory");
-            else
-                return null;
+            return parent != null 
+                ? FindGitRoot(parent.FullName) 
+                : throw new Exception("No .git directory");
         }
+
+        // Output of FindObject is argument to ReadGitObject
+        public string FindObject(string name) => name;
 
         public GitObject ReadGitObject(string sha1)
         {
@@ -128,6 +128,7 @@ namespace WriteYourselfAGit.Core
             };
         }
 
+        // Is kind of equal to Save Git Object. WriteObject calls this method.
         public static (string, byte[]) HashGitObject(GitObject obj)
         {
             var raw = obj.Serialize();
@@ -144,21 +145,17 @@ namespace WriteYourselfAGit.Core
             return (objectId, compressed);
         }
 
+        // TODO: Would be cleaner if output of HashGitObject could be passed into WriteGitObject
         public string WriteGitObject(GitObject obj, bool actuallyWrite = true)
         {
             var (objectId, compressed) = HashGitObject(obj);
-            if (actuallyWrite)
-            {
-                var relativePath = Path.Join("objects", objectId[..2], objectId[2..]);
-                var fullPath = EnsureFilePath(relativePath, true);
-                File.WriteAllBytes(fullPath, compressed);
-            }
+            if (!actuallyWrite)
+                return objectId;
+            
+            var relativePath = Path.Join(GitDirectory, "objects", objectId[..2], objectId[2..]);
+            var fullPath = EnsureFilePath(relativePath, true); // TODO: When would we use createDirectories = false?
+            File.WriteAllBytes(fullPath, compressed);
             return objectId;
-        }
-
-        public string FindObject(string name)
-        {
-            return name;
         }
     }
 
@@ -166,7 +163,6 @@ namespace WriteYourselfAGit.Core
     {
         public enum ObjectType
         {
-            None,
             Commit,
             Tree,
             Tag,
@@ -240,10 +236,10 @@ namespace WriteYourselfAGit.Core
 
     public class GitBlob : GitObject
     {
-        public override ObjectType Format => ObjectType.Blob;
+        public override ObjectType Format => ObjectType.Blob; // TODO: Why not infer format from typeof(GitBlob)?
         public byte[] Raw { get; private set; }
 
-        public GitBlob(GitRepository repository, byte[] raw) => Raw = raw;
+        public GitBlob(GitRepository repository, byte[] raw) => Raw = raw; // TODO: why pass in repository?
         public override byte[] Serialize() => Raw;
         public override void Deserialize(byte[] raw) => Raw = raw;
     }

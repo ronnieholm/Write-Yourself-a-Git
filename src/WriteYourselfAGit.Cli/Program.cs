@@ -12,27 +12,17 @@ namespace WriteYourselfAGit.Cli
 {
     static class Program
     {
-        static void Usage()
+        private static void Usage()
         {
             Console.WriteLine(@"
-                add
-                cat-file TYPE OBJECTID -- (Provide content of repository objects)
-                checkout
-                commit
-                hash-object [-w] [-t TYPE] FILE -- Compute object ID and optionally creates a blob from a file
-                init path -- (Initialize a new, empty repository)
-                log
-                ls-tree
-                merge
-                rebase
-                rev-parse
-                rm
-                show-ref
-                tag");
+                init path
+                hash-object [-w] [-t TYPE] FILE
+                cat-file TYPE OBJECTID
+            ");
             Environment.Exit(0);
         }
-        
-        static int _idx;
+
+        private static int _idx;
         
         static void Main(string[] args)
         {
@@ -55,7 +45,7 @@ namespace WriteYourselfAGit.Cli
             {
                 case "init":
                 {
-                    if (args.Length != 2)
+                    if (args.Length < 1 || args.Length > 2)
                         Usage();
 
                     // Path is optional. If missing, assume current directory.
@@ -63,109 +53,186 @@ namespace WriteYourselfAGit.Cli
                     GitRepository.Init(path);
                     break;
                 }
-                case "abc":
+                case "hash-object":
                 {
+                    // hash-object [-w] [-t TYPE] FILE
+                    if (args.Length < 1 || args.Length > 4)
+                        Usage();
+
+                    var write = false;
+                    if (args[_idx] == "-w")
+                    {
+                        write = true;
+                        _idx++;
+                    }
+
+                    var objectType = GitObject.ObjectType.Blob;
+                    if (args[_idx] == "-t")
+                    {
+                        var objectTypeString = args[_idx++];
+                        var success = Enum.TryParse<GitObject.ObjectType>(objectTypeString, true, out objectType);
+                        if (!success)
+                        {
+                            Console.WriteLine("Specify the type");
+                            Usage();
+                        }
+                        _idx++;
+                    }
+
+                    var path = args[_idx++];
+                    
+                    GitRepository? repo = null;
+                    if (write)
+                        repo = GitRepository.FindGitRoot(Environment.CurrentDirectory);
+            
+                    var bytes = File.ReadAllBytes(path);
+                    GitObject? obj = null;
+                    switch (objectType)
+                    {
+                        case GitObject.ObjectType.Commit:
+                            obj = new GitCommit(repo, bytes);
+                            break;
+                        case GitObject.ObjectType.Tree:
+                            obj = new GitTree(repo, bytes);
+                            break;
+                        case GitObject.ObjectType.Tag:
+                            obj = new GitTag(repo, bytes);              
+                            break;
+                        case GitObject.ObjectType.Blob:
+                            obj = new GitBlob(repo, bytes);
+                            break;
+                        default:
+                            throw new Exception($"Unsupported format: {objectType}");                    
+                    }
+
+                    string sha1;
+                    if (write)
+                        sha1 = repo.WriteGitObject(obj, write);
+                    else
+                        (sha1, _) = GitRepository.HashGitObject(obj);
+                
+                    Console.WriteLine(sha1);
+                    break;
+                }
+                case "cat-file":
+                {
+                    if (args.Length != 3)
+                        Usage();
+
+                    var objectTypeString = args[_idx++];
+                    var success = Enum.TryParse<GitObject.ObjectType>(objectTypeString, true, out var objectType);
+                    if (!success)
+                    {
+                        Console.WriteLine("Specify the type");
+                        Usage();
+                    }
+
+                    var objectIdString = args[_idx++];
+                    var repo = GitRepository.FindGitRoot(Environment.CurrentDirectory);
+                    var objectId = repo.FindObject(objectIdString);
+                    var obj = repo.ReadGitObject(objectId);
+                    Console.WriteLine(Encoding.ASCII.GetString(obj.Serialize()));
                     break;
                 }
             }
 
             return;
             
-            switch (args[0])
-            {
-                case "add":
-                    break;
-                case "cat-file":
-                {
-                    if (args.Length != 3)
-                        Usage();
-
-                    var success = Enum.TryParse<GitObject.ObjectType>(args[1], true, out var format);
-                    if (!success)
-                    {
-                        Console.WriteLine("Specify the type");
-                        Usage();
-                    }
-                    var objectId = args[2];
-                    CatFile(format, objectId);
-                    break;
-                }
-                case "checkout":
-                    break;
-                case "commit":
-                    break;
-                case "hash-object":
-                {
-                    if (!(args.Length == 4 || args.Length == 5))
-                        Usage();
-
-                    var write = false;
-                    GitObject.ObjectType format = GitObject.ObjectType.None;
-                    var path = "";
-
-                    var i = 1;
-                    do
-                    {
-                        if (args[i] == "-w")
-                        {
-                            write = true;
-                            i++;
-                            continue;
-                        }
-
-                        if (args[i] == "-t")
-                        {
-                            var success = Enum.TryParse<GitObject.ObjectType>(args[i + 1], true, out format);
-                            if (!success)
-                            {
-                                Console.WriteLine("Specify the type");
-                                Usage();                                
-                            }
-                            i += 2;
-                            continue;
-                        }
-
-                        if (i == args.Length - 1)
-                        {
-                            path = args[i];
-                            break;
-                        }
-                    }
-                    while (i < args.Length);
-                    HashObject(write, format, path);
-                    break;
-                }
-                case "init":
-                {                   
-                    if (args.Length != 2)
-                        Usage();
-
-                    var path = ".";
-                    if (args.Length == 2)
-                        path = args[1];
-                    GitRepository.Init(path);
-                    break;
-                }
-                case "log":
-                    break;
-                case "ls-tree":
-                    break;
-                case "merge":
-                    break;
-                case "rebase":
-                    break;
-                case "rev-parse":
-                    break;
-                case "rm":
-                    break;
-                case "show-ref":
-                    break;
-                case "tag":
-                    break;
-                default:
-                    Usage();
-                    break;
-            }
+            // switch (args[0])
+            // {
+            //     case "add":
+            //         break;
+            //     case "cat-file":
+            //     {
+            //         if (args.Length != 3)
+            //             Usage();
+            //
+            //         var success = Enum.TryParse<GitObject.ObjectType>(args[1], true, out var format);
+            //         if (!success)
+            //         {
+            //             Console.WriteLine("Specify the type");
+            //             Usage();
+            //         }
+            //         var objectId = args[2];
+            //         CatFile(format, objectId);
+            //         break;
+            //     }
+            //     case "checkout":
+            //         break;
+            //     case "commit":
+            //         break;
+            //     case "hash-object":
+            //     {
+            //         if (!(args.Length == 4 || args.Length == 5))
+            //             Usage();
+            //
+            //         var write = false;
+            //         GitObject.ObjectType format = GitObject.ObjectType.None;
+            //         var path = "";
+            //
+            //         var i = 1;
+            //         do
+            //         {
+            //             if (args[i] == "-w")
+            //             {
+            //                 write = true;
+            //                 i++;
+            //                 continue;
+            //             }
+            //
+            //             if (args[i] == "-t")
+            //             {
+            //                 var success = Enum.TryParse<GitObject.ObjectType>(args[i + 1], true, out format);
+            //                 if (!success)
+            //                 {
+            //                     Console.WriteLine("Specify the type");
+            //                     Usage();                                
+            //                 }
+            //                 i += 2;
+            //                 continue;
+            //             }
+            //
+            //             if (i == args.Length - 1)
+            //             {
+            //                 path = args[i];
+            //                 break;
+            //             }
+            //         }
+            //         while (i < args.Length);
+            //         HashObject(write, format, path);
+            //         break;
+            //     }
+            //     case "init":
+            //     {                   
+            //         if (args.Length != 2)
+            //             Usage();
+            //
+            //         var path = ".";
+            //         if (args.Length == 2)
+            //             path = args[1];
+            //         GitRepository.Init(path);
+            //         break;
+            //     }
+            //     case "log":
+            //         break;
+            //     case "ls-tree":
+            //         break;
+            //     case "merge":
+            //         break;
+            //     case "rebase":
+            //         break;
+            //     case "rev-parse":
+            //         break;
+            //     case "rm":
+            //         break;
+            //     case "show-ref":
+            //         break;
+            //     case "tag":
+            //         break;
+            //     default:
+            //         Usage();
+            //         break;
+            // }
         }
         
         static void CatFile(GitObject.ObjectType format, string objectId)
